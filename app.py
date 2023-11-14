@@ -1,11 +1,13 @@
 
 import os
-import ast
+# import ast
 from dash import Dash, dcc, html, Input, Output, State
 import json
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
+# from dateutil.relativedelta import relativedelta
 import plotly.graph_objs as go
+
+import dash_bootstrap_components as dbc
 
 from dotenv import load_dotenv
 
@@ -15,8 +17,6 @@ load_dotenv()
 keyword_list = json.loads(os.getenv("keyword_list"))
 # print(f"Keyword list: {keyword_list}")
 
-# Create a Dash web application
-app = Dash(__name__)
 
 # Read data from JSON files in the 'data' folder
 data_folder = os.getenv("datapath")
@@ -41,28 +41,153 @@ for date, entries in data.items():
     job_count_by_day[date] = len(entries)
 
 
+# the style arguments for the sidebar. We use position:fixed and a fixed width
+SIDEBAR_STYLE = {
+    "position": "fixed",
+    "top": 0,
+    "left": 0,
+    "bottom": 0,
+    "width": "16rem",
+    "padding": "2rem 1rem",
+    "background-color": "#f8f9fa",
+}
 
-# Define the layout of your app
-app.layout = html.Div([
-    html.H1("Indeed Jobs By Day"),
-    dcc.DatePickerRange(
-        id='date-range-selector',
-        start_date=min(data.keys()),  # Set the minimum date
-        end_date=max(data.keys()),    # Set the maximum date
-    ),
-    dcc.Dropdown(
-        id='term-selector',
-        options=[{'label': term.title(), 'value': term} for term in keyword_list],
-        multi=True,  # Allow multiple selections
-        value=keyword_list  # Select all terms by default
-    ),
-    dcc.Graph(id='line-graph'),
-    html.Button(
-        id='reset-button',
+# the styles for the main content position it to the right of the sidebar and
+# add some padding.
+CONTENT_STYLE = {
+    "margin-left": "18rem",
+    "margin-right": "2rem",
+    "padding": "2rem 1rem",
+}
+
+
+
+app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY],
+                           meta_tags=[{'name': 'viewport',
+                            'content': 'width=device-width, initial-scale=1.0'}]
+            )
+
+# Create sidebar card
+sidebar = dbc.Card([
+    dbc.Button(
+        "Toggle Nav Bar",
+        id="collapse-nav-button",
+        className="mb-3",
         n_clicks=0,
-        children='Reset Date Range'
+        ),
+    dbc.Collapse(
+        dbc.CardBody([
+            # html.H2("Navigation", className="display-4"),
+            html.Hr(),
+            html.P("Page Selection", className="text-center"),
+            dbc.Nav(
+                [
+                    dbc.NavLink("Home" ,href="/", active="exact"),
+                    dbc.NavLink("Indeed Jobs Graph" ,href="/page-2", active="exact"),
+                    dbc.NavLink("Page 3 - WIP" ,href="/page-3", active="exact"),
+                ],
+                vertical=True,
+                pills=True
+            )
+        ]),
+        id="collapse-nav",
+        is_open=False,
+        )
+], color="light", style={"height":"100vh",
+                         "width":"16rem", 
+                         "position":"fixed"}
+)
+
+@app.callback(
+    Output("collapse-nav", "is_open"),
+    [Input("collapse-nav-button", "n_clicks")],
+    [State("collapse-nav", "is_open")],
+)
+def toggle_collapse_nav(n, is_open):
+    if n:
+        return not is_open
+    return is_open
+
+content = html.Div(id="page-content")
+
+# Overall App Layout
+app.layout = dbc.Container([
+        dcc.Location(id='url'),
+        dbc.Row([
+            dbc.Col(sidebar,width=2),
+            dbc.Col(content)
+        ])
+    ], fluid=True
+)
+
+# # Define the layout for the home page
+home_layout = dbc.Container(
+    [
+        dbc.Container(
+            [
+                html.H1("Job Requirements Analysis", className="text-center")
+            ],
+            fluid=True,
+        ),
+    ],
+    fluid=True,
+)
+
+# Page2 layout for jobs over time graph
+page2_layout = dbc.Container(
+    [
+        dbc.Container(
+            [
+                html.H1("Indeed Jobs By Day", className='display-4 mb-4'),
+                dcc.DatePickerRange(
+                    id='date-range-selector',
+                    start_date=min(data.keys()),  # Set the minimum date
+                    end_date=max(data.keys()),    # Set the maximum date
+                    className='form-control mb-3'
+                ),
+                dcc.Dropdown(
+                    id='term-selector',
+                    options=[{'label': term.title(), 'value': term} for term in keyword_list],
+                    multi=True,  # Allow multiple selections
+                    value=keyword_list  # Select all terms by default
+                ),
+                dcc.Graph(id='line-graph', className='mb-3'),
+            ],
+            fluid=True,
+        ),
+    ],
+    fluid=True,
+)
+
+
+
+# # Define the layout for the third page (blank for now)
+# page3_layout = html.Div([
+#     html.H1("This is Page 3 (Blank for Now)"),
+#     # dcc.Link('Go to Page 2', href='/page-2')
+# ])
+
+
+
+# Define callback to update the page content based on the URL
+@app.callback(Output("page-content", "children"), [Input("url", "pathname")])
+def render_page_content(pathname):
+    if pathname == "/":
+        return home_layout
+    elif pathname == "/page-2":
+        return page2_layout
+    # elif pathname == "/page-3":
+    #     return page3_layout
+    # If the user tries to reach a different page, return a 404 message
+    return html.Div(
+        [
+            html.H1("404: Not found", className="text-danger"),
+            html.Hr(),
+            html.P(f"The pathname {pathname} was not recognised..."),
+        ],
+        className="p-3 bg-light rounded-3",
     )
-])
+
 
 # Define callback to update the line graph
 @app.callback(
@@ -70,18 +195,11 @@ app.layout = html.Div([
     Input('term-selector', 'value'),
     Input('date-range-selector', 'start_date'),
     Input('date-range-selector', 'end_date'),
-    Input('reset-button', 'n_clicks'),
-    State('date-range-selector', 'start_date'),
-    State('date-range-selector', 'end_date')
 )
-def update_line_graph(selected_terms, start_date, end_date, reset_button_clicks, initial_start_date, initial_end_date):
+def update_line_graph(selected_terms, start_date, end_date):
     start_date = datetime.strptime(start_date, '%Y-%m-%d')
     end_date = datetime.strptime(end_date, '%Y-%m-%d')
-    # Check if the reset button was clicked and reset the date range
-    if reset_button_clicks > 0:
-        start_date = datetime.strptime(initial_start_date, '%Y-%m-%d')
-        end_date = datetime.strptime(initial_end_date, '%Y-%m-%d')
-        
+
 
     data_to_plot = []
 
