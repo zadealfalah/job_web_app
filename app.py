@@ -7,16 +7,22 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import plotly.graph_objs as go
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Retrieve the keyword list from the environment variable
-keyword_list = ["data science", "data analyst", "data engineer", "machine learning engineer", "mlops"]
-print(keyword_list)
+keyword_list = json.loads(os.getenv("keyword_list"))
+# print(f"Keyword list: {keyword_list}")
 
 # Create a Dash web application
 app = Dash(__name__)
 
 # Read data from JSON files in the 'data' folder
-data_folder = os.getenv("data_path")
+data_folder = os.getenv("datapath")
+# print(f"data_folder: {data_folder}")
 json_files = [f for f in os.listdir(data_folder) if f.startswith('p-raw_data-') and f.endswith('.json')]
+# print(f"Json files: {json_files}")
 data = {}
 
 for file in json_files:
