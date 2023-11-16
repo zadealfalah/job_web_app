@@ -41,6 +41,11 @@ for date, entries in data.items():
     job_count_by_day[date] = len(entries)
 
 
+
+
+
+
+
 # the style arguments for the sidebar. We use position:fixed and a fixed width
 SIDEBAR_STYLE = {
     "position": "fixed",
@@ -235,6 +240,12 @@ def update_line_graph(selected_terms, start_date, end_date):
     layout['xaxis']['range'] = [start_date, end_date]
 
     return {'data': data_to_plot, 'layout': layout}
+
+
+
+
+
+
 
 # Run the app
 if __name__ == '__main__':
